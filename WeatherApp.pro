@@ -19,3 +19,13 @@ HEADERS += \
     include/weatherdata.hpp
 
 QT += network
+
+RESOURCES += resources/resources.qrc
+
+DISTFILES += \
+    resources/icons/sun.png \
+    resources/icons/cloud.png \
+    resources/icons/rain.png \
+    resources/icons/snow.png \
+    resources/icons/thunder.png \
+    resources/icons/default.png

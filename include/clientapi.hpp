@@ -19,7 +19,8 @@
 enum class WeatherApiError {
     None,
     NetworkError,
-    InvalidResponse
+    InvalidResponse,
+    CityNotFound
 };
 
 

@@ -10,6 +10,7 @@ void ClientApi::setApiKey(const QString& apiKey) {
 
 void ClientApi::setLocation(const Location& location) {
     m_location = location;
+    m_lastFetchTime = QDateTime();
 }
 
 void ClientApi::setCacheDuration(int seconds) {
@@ -92,7 +93,16 @@ QNetworkRequest ClientApi::createRequest(const QString& endpoint) const {
     QUrl url(m_baseUrl + endpoint);
     QUrlQuery query;
     query.addQueryItem("key",  m_apiKey);
-    query.addQueryItem("q", QString::number(m_location.latitude()) + "," + QString::number(m_location.longitude()));
+    if (m_location.hasCoordinates()) {
+        query.addQueryItem(
+            "q",
+            QString::number(m_location.latitude()) + "," +
+                QString::number(m_location.longitude())
+            );
+    } else {
+        query.addQueryItem("q", m_location.city());
+    }
+
     if (endpoint.contains("forecast")) {
         query.addQueryItem("days", "5");
     }
@@ -120,7 +130,11 @@ WeatherData ClientApi::parseCurrentWeatherJson(const QJsonObject& json) {
     data.m_humidity = static_cast<int>(current.value("humidity").toDouble());
     data.m_uvIndex = static_cast<int>(current.value("uv").toDouble());
     data.m_visibility = static_cast<int>(current.value("vis_km").toDouble());
-
+    QJsonObject astro = current.value("astro").toObject();
+    QString sunriseStr = astro.value("sunrise").toString();
+    QString sunsetStr = astro.value("sunset").toString();
+    data.m_sunrise = QDateTime::fromString(sunriseStr, "hh:mm AP");
+    data.m_sunset = QDateTime::fromString(sunsetStr, "hh:mm AP");
     return data;
 }
 

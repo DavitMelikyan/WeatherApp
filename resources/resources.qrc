@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/sun.png</file>
+        <file>icons/cloud.png</file>
+        <file>icons/rain.png</file>
+        <file>icons/snow.png</file>
+        <file>icons/thunder.png</file>
+        <file>icons/default.png</file>
+    </qresource>
+</RCC>
