@@ -59,6 +59,7 @@ public:
     WeatherData currentWeather() const;
     Forecast forecast() const;
     WeatherApiError lastError() const;
+    QString location() const;
 signals:
     void currentWeatherUpdated(const WeatherData& data);
     void forecastUpdated(const Forecast& forecast);

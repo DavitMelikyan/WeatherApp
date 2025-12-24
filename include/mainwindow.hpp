@@ -26,8 +26,6 @@ private:
     QLabel* pressure;
     QLabel* uv;
     QLabel* visibility;
-    QLabel* sunrise;
-    QLabel* sunset;
     QLineEdit* locationInput;
 
     QLabel* locationName;

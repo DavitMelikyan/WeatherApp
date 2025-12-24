@@ -15,8 +15,21 @@ public:
     int m_pressure = 0;
     int m_uvIndex = 0;
     int m_visibility = 0;
-    QDateTime m_sunrise;
-    QDateTime m_sunset;
+
+    bool operator==(const WeatherData& other) const {
+        return qFuzzyCompare(m_temperature, other.m_temperature) &&
+               qFuzzyCompare(m_feelsLike, other.m_feelsLike) &&
+               m_condition == other.m_condition &&
+               m_humidity == other.m_humidity &&
+               m_windSpeed == other.m_windSpeed &&
+               m_pressure == other.m_pressure &&
+               m_uvIndex == other.m_uvIndex &&
+               m_visibility == other.m_visibility;
+    }
+    bool operator!=(const WeatherData& other) const {
+        return !(*this == other);
+    }
 };
+
 
 #endif // WEATHERDATA_HPP

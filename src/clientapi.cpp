@@ -29,6 +29,10 @@ WeatherApiError ClientApi::lastError() const {
     return m_lastError;
 }
 
+QString ClientApi::location() const {
+    return m_location.city();
+}
+
 void ClientApi::fetchCurrentWeather() {
     if (isCacheValid()) {
         emit currentWeatherUpdated(m_currentWeather);
@@ -39,7 +43,7 @@ void ClientApi::fetchCurrentWeather() {
 
     connect(reply, &QNetworkReply::finished, this, [this,reply](){
         reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
+        if (reply->error() == QNetworkReply::NetworkSessionFailedError) {
             m_lastError = WeatherApiError::NetworkError;
             emit errorOccurred(m_lastError);
             return;
@@ -52,7 +56,22 @@ void ClientApi::fetchCurrentWeather() {
             return;
         }
 
-        m_currentWeather = parseCurrentWeatherJson(doc.object());
+        const QJsonObject root = doc.object();
+        if (root.contains("error")) {
+            const QJsonObject errorObj = root["error"].toObject();
+            const int code = errorObj["code"].toInt();
+
+            if (code == 1006) {
+                m_lastError = WeatherApiError::CityNotFound;
+            } else {
+                m_lastError = WeatherApiError::InvalidResponse;
+            }
+            emit errorOccurred(m_lastError);
+            return;
+        }
+        WeatherData ndata = parseCurrentWeatherJson(doc.object());
+        if (ndata == m_currentWeather) return;
+        m_currentWeather = ndata;
         m_lastFetchTime = QDateTime::currentDateTimeUtc();
         m_lastError = WeatherApiError::None;
         emit currentWeatherUpdated(m_currentWeather);
@@ -121,20 +140,23 @@ WeatherData ClientApi::parseCurrentWeatherJson(const QJsonObject& json) {
 
     QJsonObject current = json.value("current").toObject();
     QJsonObject condition = current.value("condition").toObject();
+    QJsonObject loc = json.value("location").toObject();
+    QString locname = loc.value("name").toString();
+
+    if (locname.trimmed().toLower() != m_location.city().toLower()) {
+        m_lastError = WeatherApiError::CityNotFound;
+        emit errorOccurred(m_lastError);
+        return m_currentWeather;
+    }
 
     data.m_condition = condition.value("text").toString();
-    data.m_temperature = static_cast<int>(current.value("temp_c").toDouble());
-    data.m_feelsLike = static_cast<int>(current.value("feelslike_c").toDouble());
+    data.m_temperature = current.value("temp_c").toDouble();
+    data.m_feelsLike = current.value("feelslike_c").toDouble();
     data.m_windSpeed = static_cast<int>(current.value("wind_kph").toDouble());
     data.m_pressure = static_cast<int>(current.value("pressure_mb").toDouble());
     data.m_humidity = static_cast<int>(current.value("humidity").toDouble());
     data.m_uvIndex = static_cast<int>(current.value("uv").toDouble());
     data.m_visibility = static_cast<int>(current.value("vis_km").toDouble());
-    QJsonObject astro = current.value("astro").toObject();
-    QString sunriseStr = astro.value("sunrise").toString();
-    QString sunsetStr = astro.value("sunset").toString();
-    data.m_sunrise = QDateTime::fromString(sunriseStr, "hh:mm AP");
-    data.m_sunset = QDateTime::fromString(sunsetStr, "hh:mm AP");
     return data;
 }
 
@@ -147,14 +169,14 @@ Forecast ClientApi::parseForecastJson(const QJsonObject& json) {
         QJsonObject condition = day.value("condition").toObject();
         ForecastEntry entry;
         entry.m_date = QDateTime::fromString(dayObj.value("date").toString(), Qt::ISODate);
-        entry.m_data.m_temperature = static_cast<int>(day.value("avgtemp_c").toDouble());
+        entry.m_data.m_temperature = day.value("avgtemp_c").toDouble();
         entry.m_data.m_condition = condition.value("text").toString();
         entry.m_data.m_humidity = static_cast<int>(day.value("avghumidity").toDouble());
         entry.m_data.m_uvIndex = static_cast<int>(day.value("uv").toDouble());
         forecast.addEntry(entry);
-        QJsonObject astro = dayObj.value("astro").toObject();
-        entry.m_data.m_sunrise = QDateTime::fromString(astro.value("sunrise").toString(), "hh:mm AP");
-        entry.m_data.m_sunset  = QDateTime::fromString(astro.value("sunset").toString(), "hh:mm AP");
+        // QJsonObject astro = dayObj.value("astro").toObject();
+        // entry.m_data.m_sunrise = QDateTime::fromString(astro.value("sunrise").toString(), "hh:mm AP");
+        // entry.m_data.m_sunset  = QDateTime::fromString(astro.value("sunset").toString(), "hh:mm AP");
 
     }
 

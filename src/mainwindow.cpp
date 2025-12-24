@@ -23,9 +23,7 @@ void MainWindow::setupUI() {
     pressure = new QLabel("Pressure: mb");
     uv = new QLabel("UV:");
     visibility = new QLabel("Visibility: km");
-    sunrise = new QLabel("Sunrise:");
-    sunset = new QLabel("Sunset:");
-    locationName = new QLabel("Unknown location");
+    locationName = new QLabel("Yerevan");
     lastUpdated = new QLabel("Last update:");
     refreshBtn = new QPushButton("Refresh");
     locationInput = new QLineEdit(this);
@@ -36,11 +34,22 @@ void MainWindow::setupUI() {
     QFont tempFont;
     tempFont.setPointSize(48);
     tempFont.setBold(true);
-    condition->setStyleSheet("font-size: 18px");
+    temperature->setStyleSheet("color: black");
+    condition->setStyleSheet("font-size: 18px; color: black");
     temperature->setFont(tempFont);
     temperature->setAlignment(Qt::AlignCenter);
     condition->setAlignment(Qt::AlignCenter);
     conditionIcon->setAlignment(Qt::AlignCenter);
+
+    feelsLike->setStyleSheet("color: black");
+    humidity->setStyleSheet("color: black");
+    windSpeed->setStyleSheet("color: black");
+    pressure->setStyleSheet("color: black");
+    uv->setStyleSheet("color: black");
+    visibility->setStyleSheet("color: black");
+    locationName ->setStyleSheet("color: black");
+    lastUpdated->setStyleSheet("color: black");
+    refreshBtn->setStyleSheet("color: black");
 
     QVBoxLayout* vLayout = new QVBoxLayout(central);
     QHBoxLayout* hLayout = new QHBoxLayout(central);
@@ -61,8 +70,6 @@ void MainWindow::setupUI() {
     detailsLayout->addWidget(pressure, 1, 0);
     detailsLayout->addWidget(uv, 1, 1);
     detailsLayout->addWidget(visibility, 2, 0);
-    detailsLayout->addWidget(sunrise, 2, 1);
-    detailsLayout->addWidget(sunset, 3, 0);
 
     vLayout->addLayout(hLayout);
     vLayout->addSpacing(10);
@@ -87,6 +94,7 @@ void MainWindow::setupConnections() {
 
         if (city.isEmpty()) return;
 
+        city[0].toUpper();
         m_api->setLocation(Location(city));
         m_api->fetchCurrentWeather();
     });
@@ -102,21 +110,15 @@ void MainWindow::onCurrentWeatherUpdated(const WeatherData& data) {
     pressure->setText("Pressure: " + QString::number(data.m_pressure) + " mb");
     uv->setText("UV: " + QString::number(data.m_uvIndex));
     visibility->setText("Visibility: " + QString::number(data.m_visibility) + " km");
+    locationName->setText(m_api->location());
+
 
     lastUpdated->setText("Last update: " + QDateTime::currentDateTime().toString("hh:mm:ss"));
 
-    sunrise->setText("Sunrise: " + data.m_sunrise.toLocalTime().toString("hh:mm"));
-    sunset->setText("Sunset: " + data.m_sunset.toLocalTime().toString("hh:mm"));
-
-    qDebug() << data.m_sunrise.toLocalTime();
-    qDebug() << data.m_sunset.toLocalTime();
-
-    locationName->setText(locationInput->text().trimmed());
-
     QString c = data.m_condition.toLower();
 
-    if (c.contains("sun") || c.contains("clear")) conditionIcon->setPixmap(QPixmap(":/icons/sun.png"));
-    else if (c.contains("cloud") || c.contains("overcast")) conditionIcon->setPixmap(QPixmap(":/icons/cloud.png"));
+    if (c.contains("sun")) conditionIcon->setPixmap(QPixmap(":/icons/sun.png"));
+    else if (c.contains("cloud") || c.contains("overcast") || c.contains("clear")) conditionIcon->setPixmap(QPixmap(":/icons/cloud.png"));
     else if (c.contains("rain") || c.contains("drizzle")) conditionIcon->setPixmap(QPixmap(":/icons/rain.png"));
     else if (c.contains("snow") || c.contains("blizzard")) conditionIcon->setPixmap(QPixmap(":/icons/snow.png"));
     else if (c.contains("thunder")) conditionIcon->setPixmap(QPixmap(":/icons/thunder.png"));
@@ -130,7 +132,10 @@ void MainWindow::onErrorOccurred(WeatherApiError error) {
 
     if (error == WeatherApiError::NetworkError) message = "Network error. Try again.";
     else if (error == WeatherApiError::InvalidResponse) message = "Invalid response from weather service.";
-    else if (error == WeatherApiError::CityNotFound) message = "Location not found.";
+    else if (error == WeatherApiError::CityNotFound) {
+        message = "Location not found.";
+        m_api->setLocation(locationName->text());
+    }
     else message = "Unknown error occurred.";
 
     QMessageBox::warning(this, "Weather Error", message);
@@ -140,7 +145,7 @@ void MainWindow::updateColorScheme(const QString& condition)
 {
     const QString c = condition.toLower();
 
-    if (c.contains("sun") || c.contains("clear")) {
+    if (c.contains("sun")) {
         setStyleSheet(
             "QMainWindow {"
             "background: qlineargradient("
@@ -149,7 +154,7 @@ void MainWindow::updateColorScheme(const QString& condition)
             "stop:1 #ffd54f);"
             "}"
             );
-    } else if (c.contains("cloud") || c.contains("overcast")) {
+    } else if (c.contains("cloud") || c.contains("overcast") || c.contains("clear")) {
         setStyleSheet(
             "QMainWindow {"
             "background: qlineargradient("
