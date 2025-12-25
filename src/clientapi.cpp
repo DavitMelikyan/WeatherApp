@@ -97,7 +97,23 @@ void ClientApi::fetchForecast() {
             return;
         }
 
-        m_forecast = parseForecastJson(doc.object());
+        const QJsonObject root = doc.object();
+        if (root.contains("error")) {
+            const QJsonObject errorObj = root["error"].toObject();
+            const int code = errorObj["code"].toInt();
+
+            if (code == 1006) {
+                m_lastError = WeatherApiError::CityNotFound;
+            } else {
+                m_lastError = WeatherApiError::InvalidResponse;
+            }
+            emit errorOccurred(m_lastError);
+            return;
+        }
+
+        Forecast ndata = parseForecastJson(doc.object());
+        if (m_forecast == ndata) return;
+        m_forecast = ndata;
         m_lastError = WeatherApiError::None;
         emit forecastUpdated(m_forecast);
     });
@@ -163,21 +179,28 @@ WeatherData ClientApi::parseCurrentWeatherJson(const QJsonObject& json) {
 Forecast ClientApi::parseForecastJson(const QJsonObject& json) {
     Forecast forecast;
     QJsonArray days = json.value("forecast").toObject().value("forecastday").toArray();
+    QJsonObject loc = json.value("location").toObject();
+    QString locname = loc.value("name").toString();
+
+    if (locname.trimmed().toLower() != m_location.city().toLower()) return m_forecast;
+
     for (const QJsonValue& value : days) {
         QJsonObject dayObj = value.toObject();
         QJsonObject day = dayObj.value("day").toObject();
         QJsonObject condition = day.value("condition").toObject();
+        QJsonObject astro = dayObj.value("astro").toObject();
+
         ForecastEntry entry;
         entry.m_date = QDateTime::fromString(dayObj.value("date").toString(), Qt::ISODate);
-        entry.m_data.m_temperature = day.value("avgtemp_c").toDouble();
-        entry.m_data.m_condition = condition.value("text").toString();
-        entry.m_data.m_humidity = static_cast<int>(day.value("avghumidity").toDouble());
-        entry.m_data.m_uvIndex = static_cast<int>(day.value("uv").toDouble());
-        forecast.addEntry(entry);
-        // QJsonObject astro = dayObj.value("astro").toObject();
-        // entry.m_data.m_sunrise = QDateTime::fromString(astro.value("sunrise").toString(), "hh:mm AP");
-        // entry.m_data.m_sunset  = QDateTime::fromString(astro.value("sunset").toString(), "hh:mm AP");
+        entry.m_maxTemp = day.value("maxtemp_c").toDouble();
+        entry.m_minTemp = day.value("mintemp_c").toDouble();
+        entry.m_precipitationChance = day.value("daily_chance_of_rain").toInt();
+        entry.m_condition = condition.value("text").toString();
+        entry.m_conditionIcon = condition.value("icon").toString();
+        entry.m_sunrise = QDateTime::fromString(astro.value("sunrise").toString(), "hh:mm AP");
+        entry.m_sunset = QDateTime::fromString(astro.value("sunset").toString(), "hh:mm AP");
 
+        forecast.addEntry(entry);
     }
 
     return forecast;

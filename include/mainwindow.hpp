@@ -9,6 +9,7 @@
 #include <QHBoxLayout>
 #include <QGridLayout>
 #include <QMessageBox>
+#include <QListWidget>
 #include "clientapi.hpp"
 #include "weatherdata.hpp"
 
@@ -32,14 +33,18 @@ private:
     QLabel* lastUpdated;
     QPushButton* refreshBtn;
 
+    QListWidget* forecastList;
+
     void setupUI();
     void setupConnections();
     void updateColorScheme(const QString& condition);
+    void showForecastDetails(const ForecastEntry& day);
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow() = default;
 private slots:
     void onCurrentWeatherUpdated(const WeatherData& data);
+    void onForecastUpdated(const Forecast& forecast);
     void onErrorOccurred(WeatherApiError error);
 };
 #endif // MAINWINDOW_HPP
