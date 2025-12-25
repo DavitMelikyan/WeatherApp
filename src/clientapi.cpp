@@ -205,3 +205,37 @@ Forecast ClientApi::parseForecastJson(const QJsonObject& json) {
 
     return forecast;
 }
+
+QVector<QString> ClientApi::searchCities(const QString& query) {
+    QVector<QString> results;
+    if (query.trimmed().isEmpty()) return results;
+    QUrl url(m_baseUrl + "/search.json");
+    QUrlQuery queryParams;
+    queryParams.addQueryItem("key", m_apiKey);
+    queryParams.addQueryItem("q", query);
+    url.setQuery(queryParams);
+
+    QNetworkRequest request(url);
+    QNetworkReply* reply = m_networkManager.get(request);
+
+    QEventLoop loop;
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        reply->deleteLater();
+        return results;
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+    reply->deleteLater();
+    if (!doc.isArray()) return results;
+
+    QJsonArray arr = doc.array();
+    for (const QJsonValue& val : arr) {
+        QJsonObject obj = val.toObject();
+        results.push_back(obj.value("name").toString());
+    }
+
+    return results;
+}

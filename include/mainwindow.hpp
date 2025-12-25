@@ -10,6 +10,9 @@
 #include <QGridLayout>
 #include <QMessageBox>
 #include <QListWidget>
+#include <QStringListModel>
+#include <QCompleter>
+#include <QSettings>
 #include "clientapi.hpp"
 #include "weatherdata.hpp"
 
@@ -34,6 +37,14 @@ private:
     QPushButton* refreshBtn;
 
     QListWidget* forecastList;
+
+    QCompleter* completer;
+    QStringListModel* completerModel;
+
+    QListWidget* savedLocationsList;
+    QPushButton* addLocationBtn;
+    QPushButton* removeLocationBtn;
+    QStringList savedLocations;
 
     void setupUI();
     void setupConnections();

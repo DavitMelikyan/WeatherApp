@@ -15,6 +15,7 @@
 #include <QUrlQuery>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QEventLoop>
 
 enum class WeatherApiError {
     None,
@@ -60,6 +61,8 @@ public:
     Forecast forecast() const;
     WeatherApiError lastError() const;
     QString location() const;
+
+    QVector<QString> searchCities(const QString& query);
 signals:
     void currentWeatherUpdated(const WeatherData& data);
     void forecastUpdated(const Forecast& forecast);

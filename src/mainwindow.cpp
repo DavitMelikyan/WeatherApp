@@ -28,8 +28,18 @@ void MainWindow::setupUI() {
     lastUpdated = new QLabel("Last update:");
     refreshBtn = new QPushButton("Refresh");
     locationInput = new QLineEdit(this);
-    locationInput->setPlaceholderText("Enter city (e.g. Yerevan)");
+    locationInput->setPlaceholderText("Search city...");
     locationInput->setClearButtonEnabled(true);
+    completerModel = new QStringListModel(this);
+    completer = new QCompleter(completerModel, this);
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    locationInput->setCompleter(completer);
+    savedLocationsList = new QListWidget;
+    addLocationBtn = new QPushButton("Add to Favorites");
+    removeLocationBtn = new QPushButton("Remove Selected");
+    QSettings settings;
+    savedLocations = settings.value("savedLocations").toStringList();
+    for (const QString& city : savedLocations) savedLocationsList->addItem(city);
 
 
     QFont tempFont;
@@ -51,11 +61,13 @@ void MainWindow::setupUI() {
     locationName ->setStyleSheet("color: black");
     lastUpdated->setStyleSheet("color: black");
     refreshBtn->setStyleSheet("color: black");
+    addLocationBtn->setStyleSheet("color: black");
+    removeLocationBtn->setStyleSheet("color: black");
 
     QHBoxLayout* rootLayout = new QHBoxLayout(central);
     QWidget* currentWeatherPanel = new QWidget;
     QVBoxLayout* currentLayout = new QVBoxLayout(currentWeatherPanel);
-    QHBoxLayout* hLayout = new QHBoxLayout(central);
+    QHBoxLayout* hLayout = new QHBoxLayout;
     hLayout->addWidget(locationName);
     hLayout->addWidget(locationInput);
     hLayout->addStretch();
@@ -88,12 +100,28 @@ void MainWindow::setupUI() {
     forecastTitle->setStyleSheet("font-size: 18px; font-weight: bold; color: black");
     forecastLayout->addWidget(forecastTitle);
 
+    forecastPanel->setStyleSheet("background: qlineargradient(""x1:0, y1:0, x2:0, y2:1, ""stop:0 #e3f2fd, ""stop:1 #90caf9)");
+    savedLocationsList->setStyleSheet(
+        "QListWidget { color: black; }"
+        "QListWidget::item:selected { background-color: #cce7ff; color: black; }"
+    );
+
     forecastList = new QListWidget;
     forecastList->setSpacing(6);
     forecastList->setSelectionMode(QAbstractItemView::SingleSelection);
     forecastList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     forecastLayout->addWidget(forecastList);
 
+    QWidget* locationPanel = new QWidget;
+    QVBoxLayout* leftLayout = new QVBoxLayout(locationPanel);
+    leftLayout->addWidget(locationInput);
+    leftLayout->addWidget(addLocationBtn);
+    leftLayout->addWidget(removeLocationBtn);
+    leftLayout->addWidget(savedLocationsList);
+
+    locationPanel->setStyleSheet("background: qlineargradient(""x1:0, y1:0, x2:0, y2:1, ""stop:0 #e3f2fd, ""stop:1 #90caf9)");
+
+    rootLayout->insertWidget(0, locationPanel, 1);
     rootLayout->addWidget(currentWeatherPanel, 3);
     rootLayout->addWidget(forecastPanel, 2);
 
@@ -130,6 +158,40 @@ void MainWindow::setupConnections() {
 
         showForecastDetails(day);
     });
+
+    connect(locationInput, &QLineEdit::textEdited, this, [this](const QString &text) {
+        if (text.length() < 2) return;
+        QVector<QString> cities = m_api->searchCities(text);
+        completerModel->setStringList(QStringList::fromVector(cities.toVector()));
+    });
+
+    connect(addLocationBtn, &QPushButton::clicked, this, [this]() {
+        QString city = locationInput->text().trimmed();
+        if (city.isEmpty()) return;
+        if (!savedLocations.contains(city)) {
+            savedLocations.append(city);
+            savedLocationsList->addItem(city);
+            QSettings settings;
+            settings.setValue("savedLocations", savedLocations);
+        }
+    });
+
+    connect(removeLocationBtn, &QPushButton::clicked, this, [this]() {
+        QListWidgetItem* item = savedLocationsList->currentItem();
+        if (!item) return;
+        QString city = item->text();
+        savedLocations.removeAll(city);
+        delete item;
+        QSettings settings;
+        settings.setValue("savedLocations", savedLocations);
+    });
+
+    connect(savedLocationsList, &QListWidget::itemClicked, this, [this](QListWidgetItem* item){
+        QString city = item->text();
+        m_api->setLocation(Location(city));
+        m_api->fetchCurrentWeather();
+        m_api->fetchForecast();
+    });
 }
 
 void MainWindow::onCurrentWeatherUpdated(const WeatherData& data) {
@@ -157,6 +219,9 @@ void MainWindow::onCurrentWeatherUpdated(const WeatherData& data) {
     else conditionIcon->setPixmap(QPixmap(":/icons/default.png"));
 
     updateColorScheme(data.m_condition);
+
+    QSettings settings;
+    settings.setValue("lastLocation", m_api->location());
 }
 
 void MainWindow::onForecastUpdated(const Forecast& forecast) {
@@ -179,6 +244,9 @@ void MainWindow::onForecastUpdated(const Forecast& forecast) {
         else if (c.contains("snow") || c.contains("blizzard")) iconPath = ":/icons/snow.png";
         else if (c.contains("thunder")) iconPath = ":/icons/thunder.png";
 
+        dayLabel->setStyleSheet("color: black");
+        temps->setStyleSheet("color: black");
+
         icon->setPixmap(QPixmap(iconPath).scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
 
         if (day.m_precipitationChance < 30) rainChance->setStyleSheet("color: green;");
@@ -193,6 +261,8 @@ void MainWindow::onForecastUpdated(const Forecast& forecast) {
 
         forecastList->setItemWidget(item, row);
     }
+    QSettings settings;
+    settings.setValue("lastLocation", m_api->location());
 }
 
 void MainWindow::onErrorOccurred(WeatherApiError error) {
@@ -209,8 +279,7 @@ void MainWindow::onErrorOccurred(WeatherApiError error) {
     QMessageBox::warning(this, "Weather Error", message);
 }
 
-void MainWindow::updateColorScheme(const QString& condition)
-{
+void MainWindow::updateColorScheme(const QString& condition) {
     const QString c = condition.toLower();
 
     if (c.contains("sun")) {
@@ -347,4 +416,3 @@ void MainWindow::showForecastDetails(const ForecastEntry& day) {
 
     dialog.exec();
 }
-
