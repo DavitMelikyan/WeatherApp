@@ -9,13 +9,15 @@ SOURCES += \
     src/forecast.cpp \
     src/location.cpp \
     src/main.cpp \
-    src/mainwindow.cpp
+    src/mainwindow.cpp \
+    src/settingsdialog.cpp
 
 HEADERS += \
     include/clientapi.hpp \
     include/forecast.hpp \
     include/location.hpp \
     include/mainwindow.hpp \
+    include/settingsdialog.hpp \
     include/weatherdata.hpp
 
 QT += network
@@ -28,4 +30,6 @@ DISTFILES += \
     resources/icons/rain.png \
     resources/icons/snow.png \
     resources/icons/thunder.png \
-    resources/icons/default.png
+    resources/icons/default.png \
+    resources/icons/settings.png \
+    resources/icons/refresh.png

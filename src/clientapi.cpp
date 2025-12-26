@@ -33,6 +33,10 @@ QString ClientApi::location() const {
     return m_location.city();
 }
 
+QString ClientApi::condition() const {
+    return m_currentWeather.m_condition;
+}
+
 void ClientApi::fetchCurrentWeather() {
     if (isCacheValid()) {
         emit currentWeatherUpdated(m_currentWeather);

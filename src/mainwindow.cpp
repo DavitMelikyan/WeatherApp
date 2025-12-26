@@ -7,9 +7,12 @@ MainWindow::MainWindow(QWidget *parent)
     setupUI();
     setupConnections();
     m_api->setApiKey("28d2c7c31f364915a14184619252212");
-    m_api->setLocation(Location("Yerevan", 40.1872, 44.5152));
+    QSettings settings;
+    QString lastCity = settings.value("lastLocation", "Yerevan").toString();
+    m_api->setLocation(Location(lastCity));
     m_api->fetchCurrentWeather();
     m_api->fetchForecast();
+    applyThemeMode(static_cast<ThemeMode>(settings.value("themeMode", 2).toInt()));
 }
 
 void MainWindow::setupUI() {
@@ -26,7 +29,8 @@ void MainWindow::setupUI() {
     visibility = new QLabel("Visibility: km");
     locationName = new QLabel("Yerevan");
     lastUpdated = new QLabel("Last update:");
-    refreshBtn = new QPushButton("Refresh");
+    refreshBtn = new QPushButton(this);
+    settingsBtn = new QPushButton(this);
     locationInput = new QLineEdit(this);
     locationInput->setPlaceholderText("Search city...");
     locationInput->setClearButtonEnabled(true);
@@ -60,9 +64,15 @@ void MainWindow::setupUI() {
     visibility->setStyleSheet("color: black");
     locationName ->setStyleSheet("color: black");
     lastUpdated->setStyleSheet("color: black");
-    refreshBtn->setStyleSheet("color: black");
     addLocationBtn->setStyleSheet("color: black");
     removeLocationBtn->setStyleSheet("color: black");
+
+    refreshBtn->setIcon(QIcon(":/icons/refresh.png"));
+    settingsBtn->setIcon(QIcon(":/icons/settings.png"));
+    refreshBtn->setFlat(true);
+    settingsBtn->setFlat(true);
+    refreshBtn->setMinimumSize(40, 40);
+    settingsBtn->setMinimumSize(40, 40);
 
     QHBoxLayout* rootLayout = new QHBoxLayout(central);
     QWidget* currentWeatherPanel = new QWidget;
@@ -73,6 +83,8 @@ void MainWindow::setupUI() {
     hLayout->addStretch();
     hLayout->addWidget(lastUpdated);
     hLayout->addWidget(refreshBtn);
+    hLayout->addWidget(settingsBtn);
+
 
     QVBoxLayout* weatherLayout = new QVBoxLayout;
     weatherLayout->addWidget(temperature);
@@ -192,15 +204,34 @@ void MainWindow::setupConnections() {
         m_api->fetchCurrentWeather();
         m_api->fetchForecast();
     });
+
+    connect(settingsBtn, &QPushButton::clicked, this, [this]() {
+        SettingsDialog dialog(this);
+
+        connect(&dialog, &SettingsDialog::temperatureUnitChanged, this, &MainWindow::applyTemperatureUnit);
+
+        connect(&dialog, &SettingsDialog::windSpeedUnitChanged, this, &MainWindow::applyWindSpeedUnit);
+
+        connect(&dialog, &SettingsDialog::refreshIntervalChanged, this, &MainWindow::applyRefreshInterval);
+
+        connect(&dialog, &SettingsDialog::themeModeChanged, this, &MainWindow::applyThemeMode);
+
+        connect(&dialog, &SettingsDialog::notificationsEnabledChanged, this, &MainWindow::applyNotificationsEnabled);
+
+        connect(&dialog, &SettingsDialog::notificationFrequencyChanged, this, &MainWindow::applyNotificationFrequency);
+
+        dialog.exec();
+    });
 }
 
 void MainWindow::onCurrentWeatherUpdated(const WeatherData& data) {
-    temperature->setText(QString::number(data.m_temperature) + "°C");
-    feelsLike->setText("Feels like: " + QString::number(data.m_feelsLike) + "°C");
+    QSettings settings;
+    temperature->setText(QString::number(settings.value("tempUnit", 0).toInt() == 1 ? data.m_temperature * 9.0 / 5.0 + 32.0 : data.m_temperature) + (settings.value("tempUnit", 0).toInt() == 1 ? "°F" : "°C"));
+    feelsLike->setText("Feels like: " + QString::number(settings.value("tempUnit", 0).toInt() == 1 ? data.m_feelsLike * 9.0 / 5.0 + 32.0 : data.m_feelsLike) + (settings.value("tempUnit", 0).toInt() == 1 ? "°F" : "°C"));
     condition->setText(data.m_condition);
 
     humidity->setText("Humidity: " + QString::number(data.m_humidity) + "%");
-    windSpeed->setText("Wind: " + QString::number(data.m_windSpeed) + " km/h");
+    windSpeed->setText("Wind: " + QString::number(settings.value("windUnit", 0).toInt() == 1 ? data.m_windSpeed * 0.621371 : data.m_windSpeed) + (settings.value("windUnit", 0).toInt() == 1 ? " mph" : " km/h"));
     pressure->setText("Pressure: " + QString::number(data.m_pressure) + " mb");
     uv->setText("UV: " + QString::number(data.m_uvIndex));
     visibility->setText("Visibility: " + QString::number(data.m_visibility) + " km");
@@ -218,22 +249,23 @@ void MainWindow::onCurrentWeatherUpdated(const WeatherData& data) {
     else if (c.contains("thunder")) conditionIcon->setPixmap(QPixmap(":/icons/thunder.png"));
     else conditionIcon->setPixmap(QPixmap(":/icons/default.png"));
 
-    updateColorScheme(data.m_condition);
+    if (settings.value("themeMode", 2).toInt() == static_cast<int>(ThemeMode::Dynamic)) updateColorScheme(data.m_condition);
 
-    QSettings settings;
     settings.setValue("lastLocation", m_api->location());
 }
 
 void MainWindow::onForecastUpdated(const Forecast& forecast) {
     qDebug() << "Forecast days:" << forecast.days().size();
     forecastList->clear();
+    QSettings settings;
     for (const ForecastEntry& day : forecast.days()) {
         QListWidgetItem* item = new QListWidgetItem(forecastList);
         item->setSizeHint(QSize(0, 70));
         QWidget* row = new QWidget;
         QHBoxLayout* rowLayout = new QHBoxLayout(row);
         QLabel* dayLabel = new QLabel(day.m_date.toString("dddd"));
-        QLabel* temps = new QLabel(QString("%1° / %2°").arg(day.m_maxTemp).arg(day.m_minTemp));
+        QString tempstr = QString::number(settings.value("tempUnit", 0).toInt() == 1 ? day.m_maxTemp * 9.0 / 5.0 + 32.0 : day.m_minTemp) + (settings.value("tempUnit", 0).toInt() == 1 ? "°F" : "°C") + " / " + QString::number(settings.value("tempUnit", 0).toInt() == 1 ? day.m_maxTemp * 9.0 / 5.0 + 32.0 : day.m_minTemp) + (settings.value("tempUnit", 0).toInt() == 1 ? "°F" : "°C");
+        QLabel* temps = new QLabel(tempstr);
         QLabel* rainChance = new QLabel(QString("%1%").arg(day.m_precipitationChance));
         QLabel* icon = new QLabel;
         QString c = day.m_condition.toLower();
@@ -261,7 +293,6 @@ void MainWindow::onForecastUpdated(const Forecast& forecast) {
 
         forecastList->setItemWidget(item, row);
     }
-    QSettings settings;
     settings.setValue("lastLocation", m_api->location());
 }
 
@@ -381,10 +412,11 @@ void MainWindow::showForecastDetails(const ForecastEntry& day) {
     title->setAlignment(Qt::AlignCenter);
     title->setStyleSheet("font-size: 18px; font-weight: bold;");
 
+    QSettings settings;
     QLabel* temps = new QLabel(
-        QString("High: %1°C    Low: %2°C")
-            .arg(day.m_maxTemp)
-            .arg(day.m_minTemp)
+        QString("High: %1    Low: %2")
+            .arg(QString::number(settings.value("tempUnit", 0).toInt() == 1 ? day.m_maxTemp * 9.0 / 5.0 + 32.0 : day.m_minTemp) + (settings.value("tempUnit", 0).toInt() == 1 ? "°F" : "°C"))
+            .arg(QString::number(settings.value("tempUnit", 0).toInt() == 1 ? day.m_maxTemp * 9.0 / 5.0 + 32.0 : day.m_minTemp) + (settings.value("tempUnit", 0).toInt() == 1 ? "°F" : "°C"))
         );
     temps->setAlignment(Qt::AlignCenter);
 
@@ -416,3 +448,60 @@ void MainWindow::showForecastDetails(const ForecastEntry& day) {
 
     dialog.exec();
 }
+
+void MainWindow::applyThemeMode(ThemeMode mode) {
+    QSettings settings;
+    settings.setValue("themeMode", static_cast<int>(mode));
+
+    if (mode == ThemeMode::Light) {
+        setStyleSheet("QMainWindow { background: #ffffff; }");
+        temperature->setStyleSheet("color: black");
+        feelsLike->setStyleSheet("color: black");
+        humidity->setStyleSheet("color: black");
+        windSpeed->setStyleSheet("color: black");
+        pressure->setStyleSheet("color: black");
+        uv->setStyleSheet("color: black");
+        visibility->setStyleSheet("color: black");
+        locationName ->setStyleSheet("color: black");
+        lastUpdated->setStyleSheet("color: black");
+    } else if (mode == ThemeMode::Dark) {
+        setStyleSheet("QMainWindow { background: #121212; }");
+        temperature->setStyleSheet("color: white");
+        feelsLike->setStyleSheet("color: white");
+        humidity->setStyleSheet("color: white");
+        windSpeed->setStyleSheet("color: white");
+        pressure->setStyleSheet("color: white");
+        uv->setStyleSheet("color: white");
+        visibility->setStyleSheet("color: white");
+        locationName ->setStyleSheet("color: white");
+        lastUpdated->setStyleSheet("color: white");
+    } else {
+        updateColorScheme(m_api->condition());
+        temperature->setStyleSheet("color: black");
+        feelsLike->setStyleSheet("color: black");
+        humidity->setStyleSheet("color: black");
+        windSpeed->setStyleSheet("color: black");
+        pressure->setStyleSheet("color: black");
+        uv->setStyleSheet("color: black");
+        visibility->setStyleSheet("color: black");
+        locationName ->setStyleSheet("color: black");
+        lastUpdated->setStyleSheet("color: black");
+    }
+}
+
+void MainWindow::applyNotificationsEnabled(bool enabled) {
+    if (!enabled) return;
+}
+
+void MainWindow::applyNotificationFrequency(NotificationFrequency frequency) { }
+
+void MainWindow::applyTemperatureUnit(TemperatureUnit) {
+    m_api->fetchCurrentWeather();
+    m_api->fetchForecast();
+}
+
+void MainWindow::applyWindSpeedUnit(WindSpeedUnit) {
+    m_api->fetchCurrentWeather();
+}
+
+void MainWindow::applyRefreshInterval(RefreshInterval interval) { }

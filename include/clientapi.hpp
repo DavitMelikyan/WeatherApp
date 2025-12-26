@@ -61,6 +61,7 @@ public:
     Forecast forecast() const;
     WeatherApiError lastError() const;
     QString location() const;
+    QString condition() const;
 
     QVector<QString> searchCities(const QString& query);
 signals:

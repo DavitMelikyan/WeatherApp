@@ -6,5 +6,7 @@
         <file>icons/snow.png</file>
         <file>icons/thunder.png</file>
         <file>icons/default.png</file>
+        <file>icons/settings.png</file>
+        <file>icons/refresh.png</file>
     </qresource>
 </RCC>

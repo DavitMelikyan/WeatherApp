@@ -15,6 +15,7 @@
 #include <QSettings>
 #include "clientapi.hpp"
 #include "weatherdata.hpp"
+#include "settingsdialog.hpp"
 
 class MainWindow : public QMainWindow
 {
@@ -35,6 +36,7 @@ private:
     QLabel* locationName;
     QLabel* lastUpdated;
     QPushButton* refreshBtn;
+    QPushButton* settingsBtn;
 
     QListWidget* forecastList;
 
@@ -57,5 +59,12 @@ private slots:
     void onCurrentWeatherUpdated(const WeatherData& data);
     void onForecastUpdated(const Forecast& forecast);
     void onErrorOccurred(WeatherApiError error);
+
+    void applyTemperatureUnit(TemperatureUnit unit);
+    void applyWindSpeedUnit(WindSpeedUnit speed);
+    void applyRefreshInterval(RefreshInterval interval);
+    void applyThemeMode(ThemeMode theme);
+    void applyNotificationsEnabled(bool enabled);
+    void applyNotificationFrequency(NotificationFrequency frequency);
 };
 #endif // MAINWINDOW_HPP
